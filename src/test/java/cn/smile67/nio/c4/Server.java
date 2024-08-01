@@ -4,8 +4,12 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
+
+import static cn.smile67.nio.c2.ByteBufferUtil.debugRead;
 
 @Slf4j
 public class Server {
@@ -40,11 +44,24 @@ public class Server {
             while (iter.hasNext()) { // 遍历的时候还想删除，得用迭代器
                 SelectionKey key = iter.next();
                 log.debug("key:{}", key);
-//                ServerSocketChannel channel = (ServerSocketChannel) key.channel();
-//                SocketChannel sc = channel.accept(); // 处理了事件，否则会发生空转
-//                log.debug("{}", sc);
-                key.cancel();
+                // 5. 区分事件类型
+                if (key.isAcceptable()) { // 处理accept事件， 是ServerSocketChannel触发的
+                    ServerSocketChannel channel = (ServerSocketChannel) key.channel();
+                    SocketChannel sc = channel.accept(); // 处理了事件，否则会发生空转
+                    sc.configureBlocking(false);
+                    SelectionKey scKey = sc.register(selector, 0, null);
+                    scKey.interestOps(SelectionKey.OP_READ);
+                    log.debug("{}", sc);
+//                key.cancel();
+                } else if (key.isReadable()) { // SocketChannel才有read事件
+                    SocketChannel channel = (SocketChannel) key.channel();
+                    ByteBuffer buffer = ByteBuffer.allocate(16);
+                    channel.read(buffer);
+                    buffer.flip();
+                    debugRead(buffer);
+                }
             }
         }
     }
 }
+
