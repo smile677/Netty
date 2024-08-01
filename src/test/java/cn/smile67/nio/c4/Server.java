@@ -19,24 +19,30 @@ public class Server {
         ByteBuffer byteBuffer = ByteBuffer.allocate(16);
         // 1.创建了服务器
         ServerSocketChannel ssc = ServerSocketChannel.open();
+        ssc.configureBlocking(false); // 非阻塞模式
         // 2.绑定监听器
         ssc.bind(new InetSocketAddress(8080));
         // 3.连接集合
         List<SocketChannel> channels = new ArrayList<>();
         while (true) {
             // 4. accept 建立与客户端连接，SocketChannel 用来与客户端之间通信
-            log.debug("connecting...");
+//            log.debug("connecting...");
             SocketChannel sc = ssc.accept();
-            log.debug("connected...");
-            channels.add(sc);
+            if (sc != null) {
+                sc.configureBlocking(false);
+                log.debug("connected...");
+                channels.add(sc);
+            }
             for (SocketChannel channel : channels) {
                 // 5. 接收客户端发送的数据
-                log.debug("before read...{}", channel);
-                channel.read(byteBuffer);// 从channel 中读数据，读到的数据写到 buffer
-                byteBuffer.flip();// 切换到读模式
-                debugRead(byteBuffer);
-                byteBuffer.clear();// 切换到写模式 清空 buffer，为下一次读做准备
-                log.debug("after read...{}", channel);
+//                log.debug("before read...{}", channel);
+                int read = channel.read(byteBuffer);// 从channel 中读数据，读到的数据写到 buffer
+                if (read > 0) {
+                    byteBuffer.flip();// 切换到读模式
+                    debugRead(byteBuffer);
+                    byteBuffer.clear();// 切换到写模式 清空 buffer，为下一次读做准备
+                    log.debug("after read...{}", channel);
+                }
             }
         }
     }
