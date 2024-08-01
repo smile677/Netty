@@ -43,6 +43,8 @@ public class Server {
             Iterator<SelectionKey> iter = selector.selectedKeys().iterator(); // accept, read
             while (iter.hasNext()) { // 遍历的时候还想删除，得用迭代器
                 SelectionKey key = iter.next();
+                // 处理key的时候，要从selectedKeys集合中删除，否则下次处理还会处理到它，但是key上没有事件再调用方法会出现NPE
+                iter.remove();// 这也是要用迭代器的原因，因为增强for循环不能在遍历的时候删除
                 log.debug("key:{}", key);
                 // 5. 区分事件类型
                 if (key.isAcceptable()) { // 处理accept事件， 是ServerSocketChannel触发的
