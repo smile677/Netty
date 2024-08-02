@@ -58,7 +58,7 @@ public class Server {
                     try {
                         SocketChannel channel = (SocketChannel) key.channel();
                         ByteBuffer buffer = ByteBuffer.allocate(16);
-                        int read = channel.read(buffer);
+                        int read = channel.read(buffer); // 如果正常断开，read 返回-1
                         if (read == -1) {
                             key.cancel();
                         } else {
@@ -67,7 +67,8 @@ public class Server {
                         }
                     } catch (IOException e) {
                         // 因为客户端断开连接，产生读事件，不断会报错，所以捕获异常，并取消key新产生的read事件
-                        key.cancel();
+                        // 即，从 selector 的 keys 集合中真正删除 key
+                        key.cancel();//
                         e.printStackTrace();
                     }
                 }
