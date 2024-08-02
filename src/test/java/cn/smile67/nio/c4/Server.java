@@ -66,8 +66,7 @@ public class Server {
                             debugRead(buffer);
                         }
                     } catch (IOException e) {
-                        // 因为客户端断开连接，产生读事件，不断会报错，所以捕获异常，并取消key新产生的read事件
-                        // 即，从 selector 的 keys 集合中真正删除 key
+                        // 因为客户端断开连接，产生读事件，不断会报错，所以捕获异常,将key取消（从 selector 的 keys 集合中真正删除 key）
                         key.cancel();//
                         e.printStackTrace();
                     }
