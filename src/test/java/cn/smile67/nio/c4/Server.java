@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
@@ -56,11 +55,21 @@ public class Server {
                     log.debug("{}", sc);
 //                key.cancel();
                 } else if (key.isReadable()) { // SocketChannel才有read事件
-                    SocketChannel channel = (SocketChannel) key.channel();
-                    ByteBuffer buffer = ByteBuffer.allocate(16);
-                    channel.read(buffer);
-                    buffer.flip();
-                    debugRead(buffer);
+                    try {
+                        SocketChannel channel = (SocketChannel) key.channel();
+                        ByteBuffer buffer = ByteBuffer.allocate(16);
+                        int read = channel.read(buffer);
+                        if (read == -1) {
+                            key.cancel();
+                        } else {
+                            buffer.flip();
+                            debugRead(buffer);
+                        }
+                    } catch (IOException e) {
+                        // 因为客户端断开连接，产生读事件，不断会报错，所以捕获异常，并取消key新产生的read事件
+                        key.cancel();
+                        e.printStackTrace();
+                    }
                 }
             }
         }
