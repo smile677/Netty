@@ -26,7 +26,8 @@ public class Server {
                 debugAll(target);
             }
         }
-        source.compact();// 压缩缓冲区，将未读的数据移到缓冲区头部  切换到写模式
+        // 压缩缓冲区，将未读的数据移到缓冲区头部  切换到写模式
+        source.compact();// 123456789abcdef position 16 limit 16
     }
 
     public static void main(String[] args) throws IOException {
@@ -67,20 +68,28 @@ public class Server {
                     ServerSocketChannel channel = (ServerSocketChannel) key.channel();
                     SocketChannel sc = channel.accept(); // 处理了事件，否则会发生空转
                     sc.configureBlocking(false);
-                    SelectionKey scKey = sc.register(selector, 0, null);
+                    ByteBuffer buffer = ByteBuffer.allocate(16);
+                    // 将一个 byteBuffer 作为附件关联到 SelectionKey 上
+                    SelectionKey scKey = sc.register(selector, 0, buffer);
                     scKey.interestOps(SelectionKey.OP_READ);
                     log.debug("{}", sc);
 //                key.cancel();
                 } else if (key.isReadable()) { // SocketChannel才有read事件
                     try {
                         SocketChannel channel = (SocketChannel) key.channel();
-                        ByteBuffer buffer = ByteBuffer.allocate(16);
+                        ByteBuffer buffer = (ByteBuffer) key.attachment();
                         int read = channel.read(buffer); // 如果正常断开，read 返回-1
                         if (read == -1) {
                             key.cancel();
                         } else {
                             split(buffer);
-//                            debugRead(buffer);
+                            if (buffer.position() == buffer.limit()) {
+                                // 需要扩容
+                                ByteBuffer newBuffer = ByteBuffer.allocate(buffer.capacity() * 2);
+                                buffer.flip();
+                                newBuffer.put(buffer); // 123456789abcdef
+                                key.attach(newBuffer);
+                            }
                         }
                     } catch (IOException e) {
                         // 因为客户端断开连接，产生读事件，不断会报错，所以捕获异常,将key取消（从 selector 的 keys 集合中真正删除 key）
