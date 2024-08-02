@@ -9,10 +9,26 @@ import java.nio.channels.*;
 import java.nio.charset.Charset;
 import java.util.Iterator;
 
+import static cn.smile67.nio.c2.ByteBufferUtil.debugAll;
 import static cn.smile67.nio.c2.ByteBufferUtil.debugRead;
 
 @Slf4j
 public class Server {
+    private static void split(ByteBuffer source) {
+        source.flip();// 切换到读模式
+        for (int i = 0; i < source.limit(); i++) {
+            if (source.get(i) == '\n') { // get(i)方法不会移动指针
+                int length = i + 1 - source.position(); // i: 换行符索引
+                ByteBuffer target = ByteBuffer.allocate(length);
+                for (int j = 0; j < length; j++) {
+                    target.put(source.get());// get() 会移动指针
+                }
+                debugAll(target);
+            }
+        }
+        source.compact();// 压缩缓冲区，将未读的数据移到缓冲区头部  切换到写模式
+    }
+
     public static void main(String[] args) throws IOException {
         // 1. 创建 selector, 管理多个 channel
         Selector selector = Selector.open();
@@ -58,14 +74,13 @@ public class Server {
                 } else if (key.isReadable()) { // SocketChannel才有read事件
                     try {
                         SocketChannel channel = (SocketChannel) key.channel();
-                        ByteBuffer buffer = ByteBuffer.allocate(4);
+                        ByteBuffer buffer = ByteBuffer.allocate(16);
                         int read = channel.read(buffer); // 如果正常断开，read 返回-1
                         if (read == -1) {
                             key.cancel();
                         } else {
-                            buffer.flip();
+                            split(buffer);
 //                            debugRead(buffer);
-                            System.out.println(Charset.defaultCharset().decode(buffer));
                         }
                     } catch (IOException e) {
                         // 因为客户端断开连接，产生读事件，不断会报错，所以捕获异常,将key取消（从 selector 的 keys 集合中真正删除 key）
