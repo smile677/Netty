@@ -50,7 +50,6 @@ public class MultiThreadServer {
         private Thread thread;
         private Selector selector;
         private String name;
-        private ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<>(); // 两个线程之间通信用的队列
         private volatile/*保证可见性*/ boolean start = false; // 是否启动初始化
 
         public Worker(String name) {
@@ -65,16 +64,9 @@ public class MultiThreadServer {
                 thread.start();
                 start = true;// 保证只进行一次初始化
             }
-            // 向队列中添加任务，但是这个任务并没有在调用线程boss中立即执行
-            queue.add(() -> {
-                try {
-                    // 将 worker 里面的选择器 selector 跟 socketChannel绑定，目的是分工：boss只负责建立连接，worker只负责读写
-                    sc.register(selector, SelectionKey.OP_READ, null); // boss线程上执行 --->放在这里任然是在boss线程上执行的
-                } catch (ClosedChannelException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            selector.wakeup(); // 唤醒阻塞的线程(select)，让线程结束阻塞，因为等下一次事件出现会比较晚
+            selector.wakeup(); // 唤醒 select 方法   boss
+            sc.register(selector, SelectionKey.OP_READ, null); // boss
+
         }
 
         // 检测读写事件
@@ -82,11 +74,7 @@ public class MultiThreadServer {
         public void run() { // 问题出现在这儿
             while (true) {
                 try {
-                    selector.select();// 监听 selector 上面的事件   先执行select后执行register就会阻塞住 但是wakeup可以让线程结束阻塞，因为等下一次事件出现会比较晚
-                    Runnable registerTask = queue.poll();
-                    if (registerTask != null) {
-                        registerTask.run();// 执行了 sc.register(selector, SelectionKey.OP_READ, null);
-                    }
+                    selector.select(); // worker-0   阻塞
                     Iterator<SelectionKey> iter = selector.selectedKeys().iterator();
                     while (iter.hasNext()) {
                         SelectionKey key = iter.next();
