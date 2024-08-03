@@ -37,10 +37,8 @@ public class MultiThreadServer {
                     log.debug("connected...{}", sc.getRemoteAddress());
                     // 2.关联 selector   worker.selector:Worker是静态内部类，所以可以通过对象实例来获取selector成员变量
                     log.debug("before...{}", sc.getRemoteAddress());
-                    // 第一个客户端来的时候有可能处理成功，但是第二个客户端来又会阻塞住
-                    worker.register(); // 初始化线程，和selector 启动 worker-0 线程
-                    // 将worker里面的选择器跟sc管理，目的是分工：boss只负责建立连接，worker只负责读写
-                    sc.register(worker.selector, SelectionKey.OP_READ, null); // boss线程上执行
+                    worker.register(sc); // 初始化线程，和selector 启动 worker-0 线程
+
                     log.debug("after...{}", sc.getRemoteAddress());
                 }
             }
@@ -59,13 +57,15 @@ public class MultiThreadServer {
         }
 
         // 初始化线程，和selector
-        public void register() throws IOException {
+        public void register(SocketChannel sc) throws IOException {
             if (!start) {
                 selector = Selector.open();
                 thread = new Thread(this, name);
                 thread.start();
                 start = true;// 保证只进行一次初始化
             }
+            // 将 worker 里面的选择器 selector 跟 socketChannel绑定，目的是分工：boss只负责建立连接，worker只负责读写
+            sc.register(selector, SelectionKey.OP_READ, null); // boss线程上执行 --->放在这里任然是在boss线程上执行的
         }
 
         // 检测读写事件
