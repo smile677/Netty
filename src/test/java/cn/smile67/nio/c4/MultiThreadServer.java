@@ -22,8 +22,13 @@ public class MultiThreadServer {
         SelectionKey bossKey = ssc.register(boss, 0, null);
         bossKey.interestOps(SelectionKey.OP_ACCEPT);
         ssc.bind(new InetSocketAddress(8080));
-        // 1.创建固定数量的worker并优化
-        Worker worker = new Worker("worker-0");
+        // 1.创建固定数量的worker并优化   更充分地利用CPU资源 充分发挥多核CPU的优势，worker数设置成CPU核数
+        Worker[] workers = new Worker[Runtime.getRuntime().availableProcessors()];
+        for (int i = 0; i < workers.length; i++) {
+            workers[i] = new Worker("worker-" + i);
+        }
+        // 定义计数器
+        AtomicInteger index = new AtomicInteger();
         while (true) {
             boss.select(); // 监听 selector 上面的事件
             Iterator<SelectionKey> iterator = boss.selectedKeys().iterator();
@@ -37,8 +42,8 @@ public class MultiThreadServer {
                     log.debug("connected...{}", sc.getRemoteAddress());
                     // 2.关联 selector   worker.selector:Worker是静态内部类，所以可以通过对象实例来获取selector成员变量
                     log.debug("before...{}", sc.getRemoteAddress());
-                    worker.register(sc); // 初始化线程，和selector 启动 worker-0 线程
-
+                    // round robin 轮询 负载均衡的算法之一
+                    workers[index.getAndIncrement() % workers.length].register(sc); // 初始化线程，和selector 启动 worker-0 线程
                     log.debug("after...{}", sc.getRemoteAddress());
                 }
             }
@@ -95,85 +100,4 @@ public class MultiThreadServer {
             }
         }
     }
-//    public static void main(String[] args) throws IOException {
-//        Thread.currentThread().setName("boss");
-//        ServerSocketChannel ssc = ServerSocketChannel.open();
-//        ssc.configureBlocking(false);
-//        Selector boss = Selector.open();
-//        SelectionKey bossKey = ssc.register(boss, 0, null);
-//        bossKey.interestOps(SelectionKey.OP_ACCEPT);
-//        ssc.bind(new InetSocketAddress(8080));
-//        // 1. 创建固定数量的 worker 并初始化
-//        Worker[] workers = new Worker[Runtime.getRuntime().availableProcessors()];
-//        for (int i = 0; i < workers.length; i++) {
-//            workers[i] = new Worker("worker-" + i);
-//        }
-//        AtomicInteger index = new AtomicInteger();
-//        while (true) {
-//            boss.select();// 监听 selector 上面的事件
-//            Iterator<SelectionKey> iter = boss.selectedKeys().iterator();
-//            while (iter.hasNext()) {
-//                SelectionKey key = iter.next();
-//                iter.remove();
-//                if (key.isAcceptable()) {// 处理连接事件
-//                    SocketChannel sc = ssc.accept();
-//                    sc.configureBlocking(false);
-//                    log.debug("connected...{}", sc.getRemoteAddress());
-//                    // 2. 关联 selector
-//                    log.debug("before register...{}", sc.getRemoteAddress());
-//                    // round robin 轮询
-//                    workers[index.getAndIncrement() % workers.length].register(sc); // boss 调用 初始化 selector , 启动 worker-0
-//                    log.debug("after register...{}", sc.getRemoteAddress());
-//                }
-//            }
-//        }
-//    }
-//
-//    static class Worker implements Runnable {
-//        private Thread thread;
-//        private Selector selector;
-//        private String name;
-//        private volatile boolean start = false; // 还未初始化
-//        private ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<>();
-//
-//        public Worker(String name) {
-//            this.name = name;
-//        }
-//
-//        // 初始化线程，和 selector
-//        public void register(SocketChannel sc) throws IOException {
-//            if (!start) {
-//                selector = Selector.open();
-//                thread = new Thread(this, name);
-//                thread.start();
-//                start = true;
-//            }
-//            selector.wakeup(); // 唤醒 select 方法 boss
-//            sc.register(selector, SelectionKey.OP_READ, null); // boss
-//        }
-//
-//        @Override
-//        public void run() {
-//            while (true) {
-//                try {
-//                    selector.select(); // worker-0  阻塞
-//                    Iterator<SelectionKey> iter = selector.selectedKeys().iterator();
-//                    while (iter.hasNext()) {
-//                        SelectionKey key = iter.next();
-//                        iter.remove();
-//                        if (key.isReadable()) {
-//                            ByteBuffer buffer = ByteBuffer.allocate(16);
-//                            SocketChannel channel = (SocketChannel) key.channel();
-//                            log.debug("read...{}", channel.getRemoteAddress());
-//                            channel.read(buffer);
-//                            buffer.flip();
-//                            debugAll(buffer);
-//                        }
-//                    }
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }
-//    }
 }
