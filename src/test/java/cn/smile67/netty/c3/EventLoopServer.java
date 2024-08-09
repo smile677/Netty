@@ -14,15 +14,25 @@ import java.nio.charset.Charset;
 @Slf4j
 public class EventLoopServer {
     public static void main(String[] args) {
+        // 更具职责不同，进行进一步的分工 除了分为boos和worker以外，如果某个Handler的执行时间较长，独立出来一个EventLoopGroup,让group中的线程来单独处理
+        // 细分2：创建一个独立的EventLoopGroup
+        EventLoopGroup group = new DefaultEventLoopGroup();
         new ServerBootstrap()
                 // 分工细分 Boss 和 Worker
-                // boss只负责ServerSocketChannel 上的 accept 事件 worker 只负责 SocketChannel 上的读写
+                //细分1： boss只负责ServerSocketChannel 上的 accept 事件 worker 只负责 SocketChannel 上的读写
                 .group(new NioEventLoopGroup(), new NioEventLoopGroup(2))
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer<NioSocketChannel>() {
                     @Override
                     protected void initChannel(NioSocketChannel nioSocketChannel) throws Exception {
-                        nioSocketChannel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                        nioSocketChannel.pipeline().addLast("handler1", new ChannelInboundHandlerAdapter() {
+                            @Override
+                            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                                ByteBuf buf = (ByteBuf) msg;
+                                log.debug(buf.toString(Charset.defaultCharset()));
+                                ctx.fireChannelRead(msg); //让消息传递给下一个handler
+                            }
+                        }).addLast(group, "handler2", new ChannelInboundHandlerAdapter() {
                             @Override
                             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                                 ByteBuf buf = (ByteBuf) msg;
@@ -33,34 +43,4 @@ public class EventLoopServer {
                 })
                 .bind(8080);
     }
-//    public static void main(String[] args) {
-//        // 细分2：创建一个独立的 EventLoopGroup
-//        EventLoopGroup group = new DefaultEventLoopGroup();
-//        new ServerBootstrap()
-//                // boss 和 worker
-//                // 细分1：boss 只负责 ServerSocketChannel 上 accept 事件     worker 只负责 socketChannel 上的读写
-//                .group(new NioEventLoopGroup(), new NioEventLoopGroup(2))
-//                .channel(NioServerSocketChannel.class)
-//                .childHandler(new ChannelInitializer<NioSocketChannel>() {
-//                    @Override
-//                    protected void initChannel(NioSocketChannel ch) throws Exception {
-//                        ch.pipeline().addLast("handler1", new ChannelInboundHandlerAdapter() {
-//                            @Override                                         // ByteBuf
-//                            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-//                                ByteBuf buf = (ByteBuf) msg;
-//                                log.debug(buf.toString(Charset.defaultCharset()));
-//                                ctx.fireChannelRead(msg); // 让消息传递给下一个handler
-//                            }
-//                        });
-//                        /*.addLast(group, "handler2", new ChannelInboundHandlerAdapter() {
-//                            @Override                                         // ByteBuf
-//                            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-//                                ByteBuf buf = (ByteBuf) msg;
-//                                log.debug(buf.toString(Charset.defaultCharset()));
-//                            }
-//                        });*/
-//                    }
-//                })
-//                .bind(8080);
-//    }
 }
