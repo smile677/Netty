@@ -28,7 +28,7 @@ public class EventLoopClient {
                 // main 发起调用，真正执行connect 是 NioEventLoopGroup 中的 nio 线程
                 .connect(new InetSocketAddress("localhost", 8080));// 返回的是一个 ChannelFuture对象  1s后
 
-        channelFuture.sync(); // 必须调用
+        channelFuture.sync(); // 必须调用 sync:同步的
         // 无阻塞向下执行获取chan nel
         Channel channel = channelFuture.channel();
         channel.writeAndFlush("hello, netty!");
