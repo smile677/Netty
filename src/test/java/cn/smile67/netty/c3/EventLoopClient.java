@@ -15,7 +15,7 @@ import java.net.InetSocketAddress;
 @Slf4j
 public class EventLoopClient {
     public static void main(String[] args) throws InterruptedException {
-        Channel channel = new Bootstrap()
+        ChannelFuture channelFuture = new Bootstrap()
                 .group(new NioEventLoopGroup())
                 .channel(NioSocketChannel.class)
                 .handler(new ChannelInitializer<NioSocketChannel>() {
@@ -24,10 +24,17 @@ public class EventLoopClient {
                         nioSocketChannel.pipeline().addLast(new StringEncoder());
                     }
                 })
-                .connect(new InetSocketAddress("localhost", 8080))
-                .sync()
-                .channel();
-        System.out.println("channel = " + channel);
+                // connect 是一个异步（不关心结果）非阻塞（给另外一个线程执行）方法
+                // main 发起调用，真正执行connect 是 NioEventLoopGroup 中的 nio 线程
+                .connect(new InetSocketAddress("localhost", 8080));// 返回的是一个 ChannelFuture对象  1s后
+
+        channelFuture.sync(); // 必须调用
+        // 无阻塞向下执行获取chan nel
+        Channel channel = channelFuture.channel();
+        channel.writeAndFlush("hello, netty!");
+        System.out.println("channel = " + channel); // 没有connect获得的channel没有端口等打印信息，说明没有真正的连接
+        // 没调用sync的打印:channel = [id: 0xea4eb269]
+        // 调用了sync的打印：channel = [id: 0x83b4d860, L:/127.0.0.1:51990 - R:localhost/127.0.0.1:8080]
         System.out.println(); // Evaluate Expression
     }
 //    public static void main(String[] args) throws InterruptedException {
